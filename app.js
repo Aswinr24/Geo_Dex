@@ -10,6 +10,8 @@ const ejsmate = require('ejs-mate')
 const methodOverride = require('method-override')
 const dotenv = require('dotenv')
 const cryptoJS = require('crypto-js')
+const { Reclaim } = require('@reclaimprotocol/js-sdk')
+const { ReclaimClient } = require('@reclaimprotocol/js-sdk')
 
 dotenv.config()
 
@@ -44,6 +46,7 @@ const abiJSON2 = fs.readFileSync(abiPath2, 'utf8')
 const contractABI2 = JSON.parse(abiJSON2)
 const contractAddress = process.env.CONTRACT_ADDRESS
 const JWT = process.env.PINATA_JWT_KEY
+const sessionId = 293829
 
 const uploadsDir = path.join(__dirname, 'uploads')
 if (!fs.existsSync(uploadsDir)) {
@@ -124,6 +127,71 @@ function generateRandomOtp(length = 6) {
   return otp.toString()
 }
 
+app.post('/callback/', async (req, res) => {
+  console.log(req.body)
+  const sessionId = req.query.callbackId
+  const proof = JSON.parse(decodeURIComponent(req.body))
+  console.log(proof)
+  const isProofVerified = await Reclaim.verifySignedProof(proof, sessionId)
+  if (!isProofVerified) {
+    return res.status(400).send({ message: 'Proof verification failed' })
+  }
+  const context = proof.claimData.context
+  const extractedParameterValues = proof.extractedParameterValues
+  return res
+    .status(200)
+    .send({ message: 'Proof verified', extractedParameterValues })
+})
+
+app.post('/submitProof', async (req, res) => {
+  console.log(req.body)
+  proof = req.body
+  const reclaimClient = new Reclaim.ProofRequest(
+    process.env.RECLAIM_APPLICATION_ID2,
+    sessionId
+  )
+  const providerIds = [process.env.RECLAIM_PROVIDER_ID2]
+  const APP_SECRET = process.env.RECLAIM_APP_SECRET2
+
+  await reclaimClient.buildProofRequest(providerIds[0])
+  reclaimClient.setAppCallbackUrl('http://localhost:8080/callback/')
+  reclaimClient.setSignature(await reclaimClient.generateSignature(APP_SECRET))
+  const { requestUrl, statusUrl } =
+    await reclaimClient.createVerificationRequest()
+  console.log(requestUrl, statusUrl)
+  res.send({ requestUrl, statusUrl })
+})
+
+app.post('/verifyProof', async (req, res) => {
+  try {
+    const { name, statusResponse } = req.body
+    console.log(req.body)
+    const proofs = statusResponse.session.proofs
+    let isMatch = false
+    for (const proof of proofs) {
+      const firstProofContext = JSON.parse(
+        statusResponse.session.proofs[0].claimData.context
+      )
+      console.log(firstProofContext)
+      const username = firstProofContext.extractedParameters.username
+      console.log(username)
+      if (username === name) {
+        isMatch = true
+        break
+      }
+    }
+
+    if (isMatch) {
+      res.json({ success: true, message: 'Verification successful' })
+    } else {
+      res.json({ success: false, message: 'Verification failed' })
+    }
+  } catch (error) {
+    console.error('Error verifying proof:', error)
+    res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
 app.post('/uploadDocument', upload.single('file'), async (req, res) => {
   const file = req.file
   console.log(file)
@@ -202,15 +270,7 @@ app.post('/registerUser', async (req, res) => {
   try {
     const txReceipt = req.body.txReceipt
     console.log('Transaction Receipt:', txReceipt)
-
-    const topics = txReceipt.logs[0].topics
-    console.log('Topics:', topics)
-
-    const userIdHex = topics[1].substring(2)
-    const userIdInt = parseInt(userIdHex, 16)
-    console.log('User ID (Integer):', userIdInt)
-
-    res.redirect(`/user?userId=${userIdInt}`)
+    res.status(200).send('Transaction receipt received successfully')
   } catch (error) {
     console.error('Error processing transaction receipt:', error)
     res.status(500).send('Error processing transaction receipt')
@@ -280,7 +340,6 @@ app.post('/setTokenURI', upload.single('file'), async (req, res) => {
       name: req.body.name + "'s Land Token",
       description: req.body.description,
       image: pinataLink,
-      price: req.body.price,
     })
     const jsonFilePath = path.join(uploadsDir, `${req.body.sname}.json`)
     fs.writeFileSync(jsonFilePath, jsonContent)

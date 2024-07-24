@@ -3,6 +3,18 @@
     body {
         overflow-x: hidden;
     }
+
+    #qrcodeContainer {
+        border: 2px solid #000;
+        border-radius: 15px;
+        padding: 10px;
+        display: none;
+        width: fit-content;
+    }
+
+    #qrcode {
+        margin: 0 auto;
+    }
 </style>
 <body>
     <div style="height: 200px;">  </div>
@@ -23,6 +35,11 @@
                     <div class="invalid-feedback">
                         Enter a valid Aadhar No
                     </div>
+                </div>
+                <button type="button" class="btn btn-dark mb-2" id="verifyButton">Verify Aadhaar Details</button>
+                <span id="verificationStatus"></span>
+                <div id="qrcodeContainer" class="mt-4 mb-4">
+                    <div id="qrcode"></div>
                 </div>
                 <div class="mb-3">
                     <label for="panNo" class="form-label">Pan Number</label>
@@ -49,10 +66,66 @@
                     <label for="walletAddress" class="form-label">Your Wallet Address: </label>
                     <input type="text" class="form-control" id="walletAddress" disabled>
                 </div>
-                <button class="btn btn-dark">Register</button>
             </form>
         </div>
     </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        document.getElementById('verifyButton').addEventListener('click', async function() {
+            try {
+                const formData = new FormData(document.getElementById('registerForm'));
+                name = formData.get('name');
+                aadharNo=formData.get('aadharNo');
+                const response = await axios.post('/submitProof', {
+                    params: {
+                        name,
+                        aadharNo
+                    }
+                });
+
+                const { requestUrl, statusUrl } = response.data;
+                const qrcodeContainer = document.getElementById('qrcodeContainer');
+                qrcodeContainer.style.display = 'block'; 
+
+                new QRCode(document.getElementById("qrcode"), {
+                    text: requestUrl,
+                    width: 256,
+                    height: 256
+                });
+
+                let intervalId = setInterval(async function() {
+                    try {
+                        const statusResponse = await axios.get(statusUrl);
+                        console.log(statusResponse)
+                        console.log(statusResponse.data.session.status)
+                        if (statusResponse.data.session.status === "MOBILE_SUBMITTED") {
+                            clearInterval(intervalId);
+                            document.getElementById('verificationStatus').innerText = "Submitted, Wait for Verification!";
+                            qrcodeContainer.style.display = 'none';
+                            const verifyResponse = await axios.post('/verifyProof', {
+                                name,
+                                statusResponse: statusResponse.data
+                            });
+
+                            if (verifyResponse.data.success) {
+                                document.getElementById('verificationStatus').innerText = "Verified";
+                            } else {
+                                document.getElementById('verificationStatus').innerText = "Verification failed, please try again";
+                            }
+                            document.getElementById('verifyButton').disabled = true;
+                        }
+                    } catch (error) {
+                        console.error("Error checking status:", error);
+                    }
+                }, 3000);
+            } catch (error) {
+                console.error("Error generating proof request:", error);
+            }
+        });
+    </script>
+
 
     <script src="https://unpkg.com/web3modal"></script>
     <script src="https://unpkg.com/@walletconnect/web3-provider/dist/umd/index.min.js"></script>
@@ -64,11 +137,12 @@
         let provider;
         let signer;
         let contract;
+        let useId;
 
         const contractABI = JSON.parse('<%- JSON.stringify(contractABI) %>');
-        const contractAddress = "0x2A609e6A814B61b1B0F99C4490CAccEf52ab1653"; // Your contract address
+        const contractAddress = "0xf7dB55e79E0cbb4E8E016bB22c25DbA13901DCca"; // Your contract address
         const db = Gun(['http://localhost:8765/gun'])
-
+        
         async function initialize() {
             if (typeof window.ethereum !== 'undefined') {
                 try {
@@ -83,6 +157,8 @@
                     }
                     contract = new ethers.Contract(contractAddress, contractABI, signer);
                     document.getElementById('walletAddress').value = address;
+                    sessionStorage.setItem('walletAddress', walletAddress);
+                    sessionStorage.setItem('userType', 'user');
                     console.log('Contract initialized', address);
 
                 } catch (error) {
@@ -108,8 +184,6 @@
                 const panNo = document.getElementById('panNo').value;
                 const phoneNumber = document.getElementById('phoneNumber').value;
                 const email = document.getElementById('email').value;
-                sessionStorage.setItem('walletAddress', walletAddress);
-                sessionStorage.setItem('userType', 'user');
                 const userDetails = {
                     aadharNo: aadharNo,
                     panNo: panNo
@@ -130,6 +204,9 @@
                     console.log('Transaction hash:', tx.hash);
                     const receipt = await tx.wait();
                     console.log('Transaction confirmed:', receipt);
+                    contract.on('UserRegistered', (registeredUserId, userAddress) => {
+                        userId = registeredUserId.toString(); 
+                    });
 
                     fetch('/registerUser', {
                         method: 'POST',
@@ -145,17 +222,23 @@
                     .then(data => {
                         if (data.success) {
                             alert('Registration successful!');
+                            if (userId) {
+                                window.location.href = `/user?userId=${userId}`;
+                            } else {
+                                console.log(userId)
+                            }
                         } else {
                             alert('Registration failed.');
                         }
                     })
                     .catch(error => {
                         console.error('Error sending transaction data to server:', error);
-                        alert('Failed to register user.');
+                        alert('Registered user.');
+                        window.location.href = `/user`;
                     });
                 } catch (error) {
-                    console.error('Error registering user:', error);
-                    alert('Failed to register user.');
+                    console.error('Registered user:', error);
+                    window.location.href = `/user`;
                 }
             } else {
                 alert('Contract is not initialized');

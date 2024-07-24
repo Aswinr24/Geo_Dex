@@ -41,10 +41,10 @@
             </table>
         </div>
         <div id="proofSection" style="display:none; margin-left:160px">
-        <form enctype="multipart/form-data" id="proofForm" >
-            <input type="file" id="proofFile" />
-            <button id="submitProofBtn" type="submit" class="button btn-dark mt-3">Submit Proof</button>
-        </form>
+            <form enctype="multipart/form-data" id="proofForm" >
+                <input type="file" id="proofFile" />
+                <button id="submitProofBtn" type="submit" class="button btn-dark mt-3">Submit Proof</button>
+            </form>
         </div>
         <div style="height: 200px;"></div>
     </section>
@@ -54,7 +54,7 @@
     <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js"></script>
     <script>
         const contractABI = JSON.parse('<%- JSON.stringify(contractABI) %>');
-        const contractAddress = "0x2A609e6A814B61b1B0F99C4490CAccEf52ab1653"; // Your contract address
+        const contractAddress = "0xf7dB55e79E0cbb4E8E016bB22c25DbA13901DCca"; // Your contract address
 
         async function fetchLandDetails(landId) {
             try {
@@ -88,7 +88,7 @@
                 saleButton.disabled = true;
             } catch (error) {
                 console.error('Error listing land for sale:', error);
-                alert("Land Not Verified By Govt, wait for the verification")
+                alert("Land Not Verified By Govt, wait for the verification");
             }
         }
 
@@ -97,23 +97,36 @@
                 const buyerDetailsTable = document.getElementById('buyerDetailsTable');
                 const buyer = await contract.getBuyerDetails(landId);
                 console.log(buyer);
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${buyer.accountAddress}</td>
-                    <td>${buyer.name}</td>
-                    <td>${buyer.phoneNumber}</td>
-                    <td>${buyer.email}</td>
-                    <td><button class="button btn-dark approveBtn">Approve</button></td>
-                `;
-                buyerDetailsTable.appendChild(row);
-        
-                const approveButtons = document.getElementsByClassName('approveBtn');
-                Array.from(approveButtons).forEach((button, index) => {
-                    button.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        document.getElementById('proofSection').style.display = 'block';
+                
+                // Retrieve stored buyers from sessionStorage
+                const storedBuyers = JSON.parse(sessionStorage.getItem('buyers')) || [];
+
+                // Check if the buyer is already stored
+                const buyerExists = storedBuyers.some(b => b.accountAddress === buyer.accountAddress);
+
+                if (!buyerExists) {
+                    // Store new buyer details
+                    storedBuyers.push(buyer);
+                    sessionStorage.setItem('buyers', JSON.stringify(storedBuyers));
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${buyer.accountAddress}</td>
+                        <td>${buyer.name}</td>
+                        <td>${buyer.phoneNumber}</td>
+                        <td>${buyer.email}</td>
+                        <td><button class="button btn-dark approveBtn">Approve</button></td>
+                    `;
+                    buyerDetailsTable.appendChild(row);
+
+                    const approveButtons = document.getElementsByClassName('approveBtn');
+                    Array.from(approveButtons).forEach((button) => {
+                        button.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            document.getElementById('proofSection').style.display = 'block';
+                        });
                     });
-                });
+                }
                 console.log('Buyer Details:', buyer);
             } catch (error) {
                 console.log('No buyers found for the given land ID.', error);
@@ -160,6 +173,8 @@
                 const receipt = await tx.wait();
                 console.log('Sale approved:', receipt);
                 alert('Sale approved successfully!');
+                // Refresh the page
+                window.location.reload();
             } catch (error) {
                 console.error('Error approving sale:', error);
             }

@@ -54,6 +54,8 @@
             await window.ethereum.request({ method: 'eth_requestAccounts' });
             const provider = new ethers.providers.Web3Provider(window.ethereum);
             console.log(typeof provider)
+            const chainId = await provider.getNetwork().then(network => network.chainId);
+            console.log(chainId)
             const signer = provider.getSigner();
             const walletAddress = await signer.getAddress();
             console.log(signer)
@@ -130,11 +132,11 @@
                     <div class="popular__data">
                         
                         <h3 class="popular__title">
-                            Owner
+                            Land
                         </h3>
-                        <form action="/land" method="GET">
+                        <form action="/landregister" method="GET">
                         <button class="popular__description button">
-                            Login
+                            Register
                         </button>
                     </form>
                     </div>
@@ -148,11 +150,11 @@
                         <div class="popular__data">
                             
                             <h3 class="popular__title">
-                                Buyer
+                                User
                             </h3>
-                            <form action="/user" method="GET">
+                            <form action="/userdetails" method="GET">
                             <button class="popular__description button">
-                                Login
+                                Register
                             </button>
                             </form>
                         </div>
@@ -168,9 +170,9 @@
                                 <h3 class="popular__title">
                                    Govt Auth
                                 </h3>
-                                <form action="/govt" method="GET">
+                                <form action="/govtauth" method="GET">
                                 <button class="popular__description button">
-                                    Login
+                                    Register
                                 </button>
                                 </form>
                             </div>
