@@ -94,8 +94,8 @@
     <script>
         const contractABI = JSON.parse('<%- JSON.stringify(contractABI) %>');
         const contractABI2 = JSON.parse('<%- JSON.stringify(contractABI2) %>');
-        const contractAddress = "0xf7dB55e79E0cbb4E8E016bB22c25DbA13901DCca"; // Your contract address
-        const contractAddress2="0x51b43aA56ec9DDaE2A46683413b87e4bb5332E90"//NFT contract address
+        const contractAddress = "0xf7dB55e79E0cbb4E8E016bB22c25DbA13901DCca"; // contract address
+        const contractAddress2="0x51b43aA56ec9DDaE2A46683413b87e4bb5332E90"//NFT-contract address
         const db = Gun(['http://localhost:8765/gun'])
         
         async function getUserDetails() {
@@ -312,8 +312,8 @@
                 const saleId = parseInt(saleTokenId, 16)
                 const landId2 = parseInt(landId, 16)
                 console.log('User ID (Integer):', saleId, landId2)
-                if (saleTokenId !== landId) {
-                    const saleDetails = await contract.getSaleDetailsForApproval(3);
+                if (saleTokenId !== landId && buyerId !== 0) {
+                    const saleDetails = await contract.getSaleDetailsForApproval(landId2);
                     console.log('Sale Details:', saleDetails);
                     document.querySelector('.card-title').textContent = `Land ID: ${landId2}`;
                     document.querySelector('.card-text:nth-of-type(1)').textContent = `Owner Address: ${saleDetails.ownerAddress}`;
@@ -337,7 +337,7 @@
                 const signer = provider.getSigner();
                 const contract = new ethers.Contract(contractAddress, contractABI, signer);
                 const contract2 = new ethers.Contract(contractAddress2, contractABI2, signer);
-                const saleDetails = await contract.getSaleDetailsForApproval(3);
+                const saleDetails = await contract.getSaleDetailsForApproval(landId);
                 const from = saleDetails.ownerAddress;
                 const to = saleDetails.buyer;
                 console.log(from, to, landId)
@@ -345,7 +345,7 @@
                 const transferTx = await contract2.transferNFT(from, to, tokenId);
                 const transferReceipt = await transferTx.wait();
                 console.log('NFT transferred:', transferReceipt);
-                const approveTx = await contract.approveSaleByAuthority(3);
+                const approveTx = await contract.approveSaleByAuthority(landId);
                 const approveReceipt = await approveTx.wait();
                 console.log('Sale approved by authority:', approveReceipt);
                 alert('Sale approved successfully by authority!');

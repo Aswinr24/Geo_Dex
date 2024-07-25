@@ -15,6 +15,11 @@
     #qrcode {
         margin: 0 auto;
     }
+
+    .verificationStatus {
+        color: green;
+        font-weight: bold;
+    }
 </style>
 <body>
     <div style="height: 200px;">  </div>
@@ -37,7 +42,7 @@
                     </div>
                 </div>
                 <button type="button" class="btn btn-dark mb-2" id="verifyButton">Verify Aadhaar Details</button>
-                <span id="verificationStatus"></span>
+                <span id="verificationStatus" class="verificationStatus"></span>
                 <div id="qrcodeContainer" class="mt-4 mb-4">
                     <div id="qrcode"></div>
                 </div>
@@ -66,6 +71,9 @@
                     <label for="walletAddress" class="form-label">Your Wallet Address: </label>
                     <input type="text" class="form-control" id="walletAddress" disabled>
                 </div>
+                <div class="mb-3">
+                <button type="submit" class="btn btn-dark" id="registerButton">Register</button>
+               </div>
             </form>
         </div>
     </div>
@@ -110,7 +118,8 @@
                             });
 
                             if (verifyResponse.data.success) {
-                                document.getElementById('verificationStatus').innerText = "Verified";
+                                document.getElementById('verificationStatus').innerText = "Verified !";
+                                //document.getElementById('registerButton').disabled = false;
                             } else {
                                 document.getElementById('verificationStatus').innerText = "Verification failed, please try again";
                             }
